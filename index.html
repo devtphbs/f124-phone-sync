@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>F1 24 Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@200;400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0a0a0f;
+    --color: #ffffff;
+    --text: #ffffff;
+    --accent: #e10600;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: 'Titillium Web', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    touch-action: manipulation;
+  }
+
+  #screen {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.4s cubic-bezier(.4,0,.2,1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Animated background pulse for flags */
+  #screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: inherit;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  #screen.pulse::before {
+    animation: pulse-anim 0.6s ease-in-out infinite alternate;
+    opacity: 1;
+  }
+
+  @keyframes pulse-anim {
+    from { background: rgba(255,255,255,0.0); }
+    to   { background: rgba(255,255,255,0.25); }
+  }
+
+  /* Blink overlay for yellow flag */
+  #blink-overlay {
+    position: absolute;
+    inset: 0;
+    background: #FFD700;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  #blink-overlay.blinking {
+    animation: blink 0.5s step-start infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.35; }
+  }
+
+  /* Main content */
+  .content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 2rem;
+    width: 100%;
+  }
+
+  /* Flag icon */
+  #flag-icon {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+    display: block;
+    transition: all 0.3s;
+    filter: drop-shadow(0 0 20px currentColor);
+  }
+
+  /* Team logo / indicator */
+  #team-badge {
+    display: inline-block;
+    padding: 0.3rem 1.2rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: all 0.3s;
+    border: 2px solid currentColor;
+  }
+
+  #team-badge.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Main message */
+  #main-message {
+    font-size: clamp(2.5rem, 10vw, 5rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    text-transform: uppercase;
+    transition: all 0.3s;
+    text-shadow: 0 4px 30px rgba(0,0,0,0.4);
+  }
+
+  /* Sub message */
+  #sub-message {
+    font-size: clamp(0.9rem, 3vw, 1.2rem);
+    font-weight: 200;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 1rem;
+    opacity: 0.7;
+  }
+
+  /* Status bar bottom */
+  #status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.8rem 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
+  #ws-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  #ws-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #666;
+    transition: background 0.3s;
+  }
+
+  #ws-dot.connected { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+  #ws-dot.disconnected { background: #ff4444; }
+
+  /* TTS toggle */
+  #tts-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: inherit;
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-family: inherit;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  #tts-btn.active {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.7);
+  }
+
+  /* Connect overlay */
+  #connect-overlay {
+    position: fixed;
+    inset: 0;
+    background: #0a0a0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 1.5rem;
+    padding: 2rem;
+  }
+
+  #connect-overlay h1 {
+    font-size: 2.5rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: #e10600;
+  }
+
+  #connect-overlay p {
+    font-size: 0.9rem;
+    opacity: 0.6;
+    letter-spacing: 0.1em;
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  #ip-input {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 0.9rem 1.2rem;
+    border-radius: 8px;
+    font-family: 'Titillium Web', monospace;
+    font-size: 1.1rem;
+    width: 100%;
+    max-width: 300px;
+    text-align: center;
+    outline: none;
+  }
+
+  #ip-input:focus {
+    border-color: #e10600;
+  }
+
+  #connect-btn {
+    background: #e10600;
+    color: white;
+    border: none;
+    padding: 0.9rem 2.5rem;
+    border-radius: 8px;
+    font-family: 'Titillium Web', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    width: 100%;
+    max-width: 300px;
+    transition: opacity 0.2s;
+  }
+
+  #connect-btn:active { opacity: 0.7; }
+
+  #f1-logo {
+    font-size: 1rem;
+    letter-spacing: 0.3em;
+    opacity: 0.4;
+    text-transform: uppercase;
+  }
+
+  /* Checkerboard for chequered flag */
+  #checker-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    background-image:
+      repeating-conic-gradient(#fff 0% 25%, #000 0% 50%);
+    background-size: 60px 60px;
+    z-index: 0;
+    transition: opacity 0.5s;
+  }
+
+  #checker-bg.visible {
+    opacity: 0.15;
+  }
+
+  /* Scan line effect */
+  #screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 3;
+  }
+</style>
+</head>
+<body>
+
+<!-- Connection setup overlay -->
+<div id="connect-overlay">
+  <div id="f1-logo">F1 24 · Live Telemetry</div>
+  <h1>RACE HQ</h1>
+  <p>Enter your laptop's local IP address<br>Make sure f1_server.py is running</p>
+  <input id="ip-input" type="text" placeholder="192.168.1.x" autocomplete="off" autocorrect="off" spellcheck="false">
+  <button id="connect-btn" onclick="connectWS()">CONNECT</button>
+</div>
+
+<!-- Main display -->
+<div id="screen">
+  <div id="checker-bg"></div>
+  <div id="blink-overlay"></div>
+
+  <div class="content">
+    <span id="flag-icon">🏁</span>
+    <div id="team-badge">F1 2024</div>
+    <div id="main-message">RACE HQ</div>
+    <div id="sub-message">Waiting for telemetry</div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div id="status-bar">
+  <div id="ws-status">
+    <div id="ws-dot" class="disconnected"></div>
+    <span id="ws-label">Disconnected</span>
+  </div>
+  <button id="tts-btn" onclick="toggleTTS()">🔊 TTS ON</button>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+let ws = null;
+let ttsEnabled = true;
+let lastMessage = "";
+let reconnectTimer = null;
+let wsHost = localStorage.getItem("f1_ws_host") || "";
+
+// ── TTS ─────────────────────────────────────────────────────────────────────
+function speak(text) {
+  if (!ttsEnabled) return;
+  if (text === lastMessage) return;
+  lastMessage = text;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 1.05;
+  utt.pitch = 1.0;
+  utt.volume = 1.0;
+  // Try to find a good voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v =>
+    v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Karen"))
+  );
+  if (preferred) utt.voice = preferred;
+  window.speechSynthesis.speak(utt);
+}
+
+function toggleTTS() {
+  ttsEnabled = !ttsEnabled;
+  const btn = document.getElementById("tts-btn");
+  btn.textContent = ttsEnabled ? "🔊 TTS ON" : "🔇 TTS OFF";
+  btn.classList.toggle("active", ttsEnabled);
+}
+
+// ── State → UI ───────────────────────────────────────────────────────────────
+const screen       = document.getElementById("screen");
+const mainMsg      = document.getElementById("main-message");
+const subMsg       = document.getElementById("sub-message");
+const flagIcon     = document.getElementById("flag-icon");
+const teamBadge    = document.getElementById("team-badge");
+const blinkOverlay = document.getElementById("blink-overlay");
+const checkerBg    = document.getElementById("checker-bg");
+
+function applyState(state) {
+  // Background color
+  screen.style.backgroundColor = state.color;
+  screen.style.color = state.text_color;
+
+  // Reset effects
+  blinkOverlay.classList.remove("blinking");
+  screen.classList.remove("pulse");
+  checkerBg.classList.remove("visible");
+
+  // Message
+  mainMsg.textContent = state.message;
+  mainMsg.style.color = state.text_color;
+
+  // Team badge
+  if (state.team) {
+    teamBadge.textContent = state.team;
+    teamBadge.style.color = state.text_color;
+    teamBadge.style.borderColor = state.text_color;
+    teamBadge.classList.add("visible");
+  } else {
+    teamBadge.classList.remove("visible");
+  }
+
+  // Type-specific effects
+  switch(state.type) {
+    case "red_flag":
+      flagIcon.textContent = "🚩";
+      subMsg.textContent = "Session suspended";
+      screen.classList.add("pulse");
+      speak("Red flag. Session suspended.");
+      break;
+
+    case "yellow_flag":
+      flagIcon.textContent = "⚠️";
+      subMsg.textContent = "Slow down — danger ahead";
+      blinkOverlay.classList.add("blinking");
+      speak("Yellow flag. Slow down.");
+      break;
+
+    case "safety_car":
+      flagIcon.textContent = "🚗";
+      subMsg.textContent = "Safety car deployed";
+      speak("Safety car. Maintain position.");
+      break;
+
+    case "vsc":
+      flagIcon.textContent = "🚗";
+      subMsg.textContent = "Virtual safety car";
+      speak("Virtual safety car. Slow down.");
+      break;
+
+    case "team_lead":
+      flagIcon.textContent = "🏎️";
+      subMsg.textContent = "LEADING THE RACE";
+      speak(`${state.team} leads`);
+      break;
+
+    case "chequered":
+      flagIcon.textContent = "🏁";
+      subMsg.textContent = "Race over";
+      checkerBg.classList.add("visible");
+      screen.style.backgroundColor = "#111";
+      mainMsg.style.color = "#ffffff";
+      speak("Chequered flag. Race over.");
+      break;
+
+    case "session_start":
+      flagIcon.textContent = "🟢";
+      subMsg.textContent = "GO GO GO";
+      speak("Session started. Go go go.");
+      break;
+
+    case "session_end":
+      flagIcon.textContent = "🏁";
+      subMsg.textContent = "Session complete";
+      speak("Session ended.");
+      break;
+
+    default:
+      flagIcon.textContent = "📡";
+      subMsg.textContent = "Listening...";
+  }
+}
+
+// ── WebSocket ────────────────────────────────────────────────────────────────
+function connectWS() {
+  const input = document.getElementById("ip-input").value.trim();
+  if (!input) return;
+
+  wsHost = input;
+  localStorage.setItem("f1_ws_host", wsHost);
+
+  if (ws) { ws.close(); ws = null; }
+
+  const url = `ws://${wsHost}:8765`;
+  document.getElementById("ws-label").textContent = "Connecting...";
+
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    document.getElementById("ws-dot").className = "connected";
+    document.getElementById("ws-label").textContent = wsHost;
+    document.getElementById("connect-overlay").style.display = "none";
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const state = JSON.parse(e.data);
+      applyState(state);
+    } catch(err) { console.error(err); }
+  };
+
+  ws.onclose = () => {
+    document.getElementById("ws-dot").className = "disconnected";
+    document.getElementById("ws-label").textContent = "Reconnecting...";
+    reconnectTimer = setTimeout(() => connectWS(), 3000);
+  };
+
+  ws.onerror = () => {
+    document.getElementById("ws-label").textContent = "Error";
+  };
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+// Pre-fill saved IP
+if (wsHost) {
+  document.getElementById("ip-input").value = wsHost;
+}
+
+// Load TTS voices
+window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+
+// Init button style
+document.getElementById("tts-btn").classList.add("active");
+
+// Connect on Enter
+document.getElementById("ip-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") connectWS();
+});
+</script>
+</body>
+</html>
